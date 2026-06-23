@@ -116,7 +116,7 @@ func TestViewShowsConfigurationFields(t *testing.T) {
 	}
 }
 
-func TestEnabledCheckboxTogglesHyprsunsetService(t *testing.T) {
+func TestRightArrowEnablesHyprsunsetService(t *testing.T) {
 	binDir := t.TempDir()
 	argsFile := filepath.Join(t.TempDir(), "uwsm-args")
 	t.Setenv("PATH", binDir)
@@ -124,9 +124,9 @@ func TestEnabledCheckboxTogglesHyprsunsetService(t *testing.T) {
 	writeExecutable(t, binDir, "uwsm", "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$UWSM_ARGS_FILE\"\nexit 0\n")
 
 	m := model{focusedPanel: commonPanel}
-	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRight})
 	if cmd == nil {
-		t.Fatal("Update(space) cmd = nil, want uwsm command")
+		t.Fatal("Update(right) cmd = nil, want uwsm command")
 	}
 
 	msg := cmd()
