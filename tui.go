@@ -155,7 +155,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status, m.statusErr = msg.text, msg.isErr
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "tab":
+		case "tab", "shift+tab":
 			// Toggle between the two panels (0<->1)
 			m.focusedPanel = commonPanel - m.focusedPanel
 		case "up":
@@ -191,11 +191,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 			fields[m.cursor].adjust(&m, 1)
-		case " ", "x":
-			// Space/x flips the enabled toggle from the Simple panel
-			if m.focusedPanel == commonPanel {
-				return m, setEnabledCmd(!m.enabled)
-			}
 		case "enter":
 			// Apply current temp/gamma to the live session
 			return m, applyCmd(m.temp, m.gamma)
@@ -331,7 +326,7 @@ func (m model) View() string {
 
 	// Two-line key hint footer
 	fmt.Fprintf(&b, "\n%s\n", dimStyle.Render("[tab] panel   [↑/↓] select   [←/→] adjust"))
-	fmt.Fprintf(&b, "%s\n", dimStyle.Render("[space] enable   [enter] apply   [s] save   [q] quit"))
+	fmt.Fprintf(&b, "%s\n", dimStyle.Render("[enter] apply   [s] save   [q] quit"))
 	// Status line, red on error
 	if m.status != "" {
 		style := dimStyle
