@@ -122,6 +122,54 @@ func TestProfileAddDeleteKeys(t *testing.T) {
 	}
 }
 
+func TestBackspaceClearsAndReaddsField(t *testing.T) {
+	step := func(m model, k tea.KeyType) model {
+		next, _ := m.Update(tea.KeyMsg{Type: k})
+		return next.(model)
+	}
+
+	m := model{
+		focusedPanel: advancedPanel,
+		profiles:     []hyprsunsetProfile{{time: "12:00", temperature: 6000, gamma: 1.0}},
+	}
+
+	// Profile=0, Time=1, Identity=2, Temperature=3
+	m = step(step(step(m, tea.KeyDown), tea.KeyDown), tea.KeyDown)
+
+	// Backspace clears the attribute; it renders as the unset marker
+	m = step(m, tea.KeyBackspace)
+	if m.current().isSet(temperatureBit) {
+		t.Fatal("temperature still set after backspace")
+	}
+	if got := fields[m.cursor].render(m); got != unsetMark {
+		t.Fatalf("render after clear = %q, want %q", got, unsetMark)
+	}
+
+	// ←/→ re-adds it (the mistake is recoverable)
+	m = step(m, tea.KeyRight)
+	if !m.current().isSet(temperatureBit) {
+		t.Fatal("temperature not re-added after adjust")
+	}
+
+	// Profile selector (bit 0) is not clearable
+	top := model{focusedPanel: advancedPanel, profiles: []hyprsunsetProfile{{}, {}}}
+	if got := step(top, tea.KeyBackspace); got.current().unset != 0 {
+		t.Fatalf("backspace on Profile selector set unset = %b, want 0", got.current().unset)
+	}
+}
+
+func TestUnsetFieldOmittedFromConfig(t *testing.T) {
+	out := string(formatHyprsunsetProfiles([]hyprsunsetProfile{
+		{time: "07:00", temperature: 6000, gamma: 1.0, unset: temperatureBit},
+	}))
+	if strings.Contains(out, "temperature") {
+		t.Fatalf("cleared temperature still in config: %q", out)
+	}
+	if !strings.Contains(out, "time = 07:00") || !strings.Contains(out, "gamma = 1.0") {
+		t.Fatalf("present fields missing from config: %q", out)
+	}
+}
+
 func TestClamp(t *testing.T) {
 	if clamp(500, tempMin, tempMax) != tempMin {
 		t.Fatal("below min not clamped")
@@ -348,8 +396,8 @@ profile {
 			t.Fatalf("parseProfiles() error = %v", err)
 		}
 		want := []hyprsunsetProfile{
-			{time: "07:00", temperature: neutralTemp, gamma: 0.5},
-			{time: "21:00", temperature: 4000, gamma: neutralGamma},
+			{time: "07:00", temperature: neutralTemp, gamma: 0.5, unset: temperatureBit | identityBit},
+			{time: "21:00", temperature: 4000, gamma: neutralGamma, unset: gammaBit | identityBit},
 		}
 		if !reflect.DeepEqual(profiles, want) {
 			t.Fatalf("profiles = %+v, want %+v", profiles, want)

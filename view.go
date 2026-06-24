@@ -114,7 +114,7 @@ func (m model) View() string {
 	// Two-line key hint footer; first line depends on the focused panel
 	directions := "[tab] panel   [space] toggle"
 	if m.focusedPanel == advancedPanel {
-		directions = "[tab] panel   [↑/↓] select   [←/→] adjust   [n] new   [d] del"
+		directions = "[tab] panel   [↑/↓] select   [←/→] adjust   [bksp] clear   [n] new   [d] del"
 	}
 	fmt.Fprintf(&b, "\n%s\n", dimStyle.Render(directions))
 	fmt.Fprintf(&b, "%s\n", dimStyle.Render("[s] save   [q] quit"))

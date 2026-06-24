@@ -14,11 +14,28 @@ const hyprsunsetConfigPath = "hypr/hyprsunset.conf"
 
 // hyprsunsetProfile is one `profile { ... }` block from the config
 type hyprsunsetProfile struct {
-	time        string  // schedule time, "HH:MM"
-	temperature int     // colour temperature in Kelvin
-	gamma       float32 // gamma multiplier
-	identity    bool    // hyprsunset identity flag
+	time        string   // schedule time, "HH:MM"
+	temperature int      // colour temperature in Kelvin
+	gamma       float32  // gamma multiplier
+	identity    bool     // hyprsunset identity flag
+	unset       fieldBit // attributes the user cleared; omitted from the saved config
 }
+
+// fieldBit marks one optional profile attribute. Zero value means every
+// attribute is present, so existing profile literals and the default keep
+// behaving as before.
+type fieldBit uint8
+
+const (
+	timeBit fieldBit = 1 << iota
+	identityBit
+	temperatureBit
+	gammaBit
+	allFields = timeBit | identityBit | temperatureBit | gammaBit
+)
+
+// isSet reports whether attribute b is present (not cleared by the user)
+func (p hyprsunsetProfile) isSet(b fieldBit) bool { return p.unset&b == 0 }
 
 // defaultHyprsunsetProfile is the neutral fallback when nothing is on disk
 func defaultHyprsunsetProfile() hyprsunsetProfile {
@@ -101,10 +118,18 @@ func formatHyprsunsetProfiles(profiles []hyprsunsetProfile) []byte {
 			b.WriteByte('\n')
 		}
 		fmt.Fprintln(&b, "profile {")
-		fmt.Fprintf(&b, "    time = %s\n", profile.time)
-		fmt.Fprintf(&b, "    identity = %t\n", profile.identity)
-		fmt.Fprintf(&b, "    temperature = %d\n", profile.temperature)
-		fmt.Fprintf(&b, "    gamma = %.1f\n", profile.gamma)
+		if profile.isSet(timeBit) {
+			fmt.Fprintf(&b, "    time = %s\n", profile.time)
+		}
+		if profile.isSet(identityBit) {
+			fmt.Fprintf(&b, "    identity = %t\n", profile.identity)
+		}
+		if profile.isSet(temperatureBit) {
+			fmt.Fprintf(&b, "    temperature = %d\n", profile.temperature)
+		}
+		if profile.isSet(gammaBit) {
+			fmt.Fprintf(&b, "    gamma = %.1f\n", profile.gamma)
+		}
 		fmt.Fprintln(&b, "}")
 	}
 	return b.Bytes()
@@ -162,6 +187,7 @@ func replaceProfilesContent(content []byte, profiles []hyprsunsetProfile) []byte
 func parseProfiles(content []byte) ([]hyprsunsetProfile, error) {
 	var profiles []hyprsunsetProfile
 	profile := defaultHyprsunsetProfile()
+	var seen fieldBit  // attributes present in the current block
 	inProfile := false // are we inside a profile block right now
 
 	for _, rawLine := range strings.Split(string(content), "\n") {
@@ -172,8 +198,11 @@ func parseProfiles(content []byte) ([]hyprsunsetProfile, error) {
 		case line == "profile {":
 			// New block: start from defaults so omitted keys keep neutral values
 			profile = defaultHyprsunsetProfile()
+			seen = 0
 			inProfile = true
 		case line == "}" && inProfile:
+			// Keys absent from the block are treated as user-cleared (unset)
+			profile.unset = allFields &^ seen
 			profiles = append(profiles, profile)
 			inProfile = false
 		case inProfile:
@@ -188,6 +217,7 @@ func parseProfiles(content []byte) ([]hyprsunsetProfile, error) {
 			switch key {
 			case "time":
 				profile.time = value
+				seen |= timeBit
 			case "temperature":
 				temperature, err := strconv.Atoi(value)
 				if err != nil {
@@ -195,6 +225,7 @@ func parseProfiles(content []byte) ([]hyprsunsetProfile, error) {
 				}
 
 				profile.temperature = temperature
+				seen |= temperatureBit
 			case "gamma":
 				gamma, err := strconv.ParseFloat(value, 32)
 				if err != nil {
@@ -202,6 +233,7 @@ func parseProfiles(content []byte) ([]hyprsunsetProfile, error) {
 				}
 
 				profile.gamma = float32(gamma)
+				seen |= gammaBit
 			case "identity":
 				identity, err := strconv.ParseBool(value)
 				if err != nil {
@@ -209,6 +241,7 @@ func parseProfiles(content []byte) ([]hyprsunsetProfile, error) {
 				}
 
 				profile.identity = identity
+				seen |= identityBit
 			}
 		}
 	}

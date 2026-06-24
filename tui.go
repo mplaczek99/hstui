@@ -167,6 +167,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 			fields[m.cursor].adjust(&m, 1)
+		case "backspace":
+			// Clear the selected attribute so it's omitted from the saved
+			// config; |= 0 is a no-op on the Profile selector. Re-add with ←/→.
+			if m.focusedPanel != advancedPanel {
+				break
+			}
+			m.current().unset |= fields[m.cursor].bit
 		case "n":
 			// New profile (Advanced only): append a default and select it
 			if m.focusedPanel != advancedPanel {
@@ -199,36 +206,60 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// unsetMark is shown for an attribute the user cleared with backspace
+const unsetMark = "—"
+
 // field is one editable row; render shows the value, adjust changes it by dir (-1/+1)
 type field struct {
 	label  string
+	bit    fieldBit // attribute this row edits; 0 = not clearable (Profile selector)
 	render func(m model) string
 	adjust func(m *model, dir int)
+}
+
+// shown renders val, or the unset marker if attribute b was cleared
+func shown(m model, b fieldBit, val func() string) string {
+	if !m.current().isSet(b) {
+		return unsetMark
+	}
+	return val()
+}
+
+// edit applies f and marks attribute b present again, re-adding a cleared value
+func edit(m *model, b fieldBit, f func()) {
+	m.current().unset &^= b
+	f()
 }
 
 // fields is the ordered list of rows in the Advanced panel. fields[0] selects
 // which profile is being edited; the rest edit that profile's attributes.
 var fields = []field{
 	// Profile: cycle the selected profile; render shows position in the list
-	{"Profile", func(m model) string { return fmt.Sprintf("[%d/%d]", m.selected+1, len(m.profiles)) }, func(m *model, d int) {
+	{"Profile", 0, func(m model) string { return fmt.Sprintf("[%d/%d]", m.selected+1, len(m.profiles)) }, func(m *model, d int) {
 		n := len(m.profiles)
 		m.selected = (m.selected + d + n) % n
 	}},
 	// Time: shift by timeStep minutes, wrapping at midnight
-	{"Time", func(m model) string { return m.current().time }, func(m *model, d int) {
-		m.current().time = adjustTime(m.current().time, d*timeStep)
+	{"Time", timeBit, func(m model) string { return shown(m, timeBit, func() string { return m.current().time }) }, func(m *model, d int) {
+		edit(m, timeBit, func() { m.current().time = adjustTime(m.current().time, d*timeStep) })
 	}},
 	// Identity: boolean toggle; direction is ignored
-	{"Identity", func(m model) string { return strconv.FormatBool(m.current().identity) }, func(m *model, d int) {
-		m.current().identity = !m.current().identity
+	{"Identity", identityBit, func(m model) string {
+		return shown(m, identityBit, func() string { return strconv.FormatBool(m.current().identity) })
+	}, func(m *model, d int) {
+		edit(m, identityBit, func() { m.current().identity = !m.current().identity })
 	}},
 	// Temperature: step by tempStep K, clamped to [tempMin, tempMax]
-	{"Temperature", func(m model) string { return strconv.Itoa(m.current().temperature) + " K" }, func(m *model, d int) {
-		m.current().temperature = clamp(m.current().temperature+d*tempStep, tempMin, tempMax)
+	{"Temperature", temperatureBit, func(m model) string {
+		return shown(m, temperatureBit, func() string { return strconv.Itoa(m.current().temperature) + " K" })
+	}, func(m *model, d int) {
+		edit(m, temperatureBit, func() { m.current().temperature = clamp(m.current().temperature+d*tempStep, tempMin, tempMax) })
 	}},
 	// Gamma: step by gammaStep, clamped to [gammaMin, gammaMax]
-	{"Gamma", func(m model) string { return fmt.Sprintf("%.1f", m.current().gamma) }, func(m *model, d int) {
-		m.current().gamma = clamp(m.current().gamma+float32(d)*gammaStep, gammaMin, gammaMax)
+	{"Gamma", gammaBit, func(m model) string {
+		return shown(m, gammaBit, func() string { return fmt.Sprintf("%.1f", m.current().gamma) })
+	}, func(m *model, d int) {
+		edit(m, gammaBit, func() { m.current().gamma = clamp(m.current().gamma+float32(d)*gammaStep, gammaMin, gammaMax) })
 	}},
 }
 
