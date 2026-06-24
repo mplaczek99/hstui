@@ -45,12 +45,6 @@ type model struct {
 // current returns a pointer to the profile being edited
 func (m *model) current() *hyprsunsetProfile { return &m.profiles[m.selected] }
 
-// cloneProfiles copies a profile slice; profiles are flat value structs, so a
-// fresh backing array fully detaches it (used for the diff baseline)
-func cloneProfiles(profiles []hyprsunsetProfile) []hyprsunsetProfile {
-	return slices.Clone(profiles)
-}
-
 // panel identifies a focusable region of the UI
 type panel int
 
@@ -72,7 +66,7 @@ func initialModel() model {
 	m := model{
 		profiles:      profiles,
 		focusedPanel:  commonPanel,
-		saved:         cloneProfiles(profiles),
+		saved:         slices.Clone(profiles),
 		maxGamma:      maxGamma,
 		savedMaxGamma: maxGamma,
 	}
@@ -123,7 +117,7 @@ func setEnabledCmd(enabled bool) tea.Cmd {
 
 // saveConfigCmd writes the profiles to disk and updates the diff baseline
 func saveConfigCmd(profiles []hyprsunsetProfile, maxGamma int) tea.Cmd {
-	saved := cloneProfiles(profiles)
+	saved := slices.Clone(profiles)
 	return func() tea.Msg {
 		if err := saveHyprsunsetProfiles(saved, maxGamma); err != nil {
 			return statusMsg{text: "save: " + err.Error(), isErr: true}
