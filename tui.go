@@ -70,7 +70,7 @@ func initialModel() model {
 	// Reflect whether hyprsunset is actually running right now
 	enabled, err := IsHyprsunsetRunning()
 	if err != nil {
-		m.status = "uwsm: " + err.Error()
+		m.status = "hyprsunset: " + err.Error()
 		m.statusErr = true
 	} else {
 		m.enabled = enabled
