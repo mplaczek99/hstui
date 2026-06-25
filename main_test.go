@@ -310,7 +310,6 @@ func TestSpaceTogglesSimpleCheckbox(t *testing.T) {
 	t.Setenv("UWSM_ARGS_FILE", argsFile)
 	t.Setenv("PKILL_ARGS_FILE", pkillArgs)
 	writeExecutable(t, binDir, "uwsm", "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$UWSM_ARGS_FILE\"\nexit 0\n")
-	writeExecutable(t, binDir, "hyprctl", "#!/bin/sh\nexit 0\n")
 	writeExecutable(t, binDir, "pkill", "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$PKILL_ARGS_FILE\"\nexit 0\n")
 
 	m := model{}
@@ -554,8 +553,8 @@ func TestCheckDependencies(t *testing.T) {
 	t.Run("all dependencies present", func(t *testing.T) {
 		binDir := t.TempDir()
 		writeExecutable(t, binDir, "hyprsunset", "#!/bin/sh\nexit 0\n")
-		writeExecutable(t, binDir, "hyprctl", "#!/bin/sh\nexit 0\n")
 		writeExecutable(t, binDir, "uwsm", "#!/bin/sh\nexit 0\n")
+		writeExecutable(t, binDir, "notify-send", "#!/bin/sh\nexit 0\n")
 		t.Setenv("PATH", binDir)
 
 		if err := CheckDependencies(); err != nil {
@@ -565,7 +564,8 @@ func TestCheckDependencies(t *testing.T) {
 
 	t.Run("missing hyprsunset", func(t *testing.T) {
 		binDir := t.TempDir()
-		writeExecutable(t, binDir, "hyprctl", "#!/bin/sh\nexit 0\n")
+		writeExecutable(t, binDir, "uwsm", "#!/bin/sh\nexit 0\n")
+		writeExecutable(t, binDir, "notify-send", "#!/bin/sh\nexit 0\n")
 		t.Setenv("PATH", binDir)
 
 		err := CheckDependencies()
@@ -577,24 +577,10 @@ func TestCheckDependencies(t *testing.T) {
 		}
 	})
 
-	t.Run("missing hyprctl", func(t *testing.T) {
-		binDir := t.TempDir()
-		writeExecutable(t, binDir, "hyprsunset", "#!/bin/sh\nexit 0\n")
-		t.Setenv("PATH", binDir)
-
-		err := CheckDependencies()
-		if err == nil {
-			t.Fatal("CheckDependencies() error = nil, want missing hyprctl error")
-		}
-		if !strings.Contains(err.Error(), "hyprctl") {
-			t.Fatalf("CheckDependencies() error = %q, want hyprctl", err)
-		}
-	})
-
 	t.Run("missing uwsm", func(t *testing.T) {
 		binDir := t.TempDir()
 		writeExecutable(t, binDir, "hyprsunset", "#!/bin/sh\nexit 0\n")
-		writeExecutable(t, binDir, "hyprctl", "#!/bin/sh\nexit 0\n")
+		writeExecutable(t, binDir, "notify-send", "#!/bin/sh\nexit 0\n")
 		t.Setenv("PATH", binDir)
 
 		err := CheckDependencies()
@@ -603,6 +589,21 @@ func TestCheckDependencies(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "uwsm") {
 			t.Fatalf("CheckDependencies() error = %q, want uwsm", err)
+		}
+	})
+
+	t.Run("missing notify-send", func(t *testing.T) {
+		binDir := t.TempDir()
+		writeExecutable(t, binDir, "hyprsunset", "#!/bin/sh\nexit 0\n")
+		writeExecutable(t, binDir, "uwsm", "#!/bin/sh\nexit 0\n")
+		t.Setenv("PATH", binDir)
+
+		err := CheckDependencies()
+		if err == nil {
+			t.Fatal("CheckDependencies() error = nil, want missing notify-send error")
+		}
+		if !strings.Contains(err.Error(), "notify-send") {
+			t.Fatalf("CheckDependencies() error = %q, want notify-send", err)
 		}
 	})
 }
