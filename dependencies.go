@@ -6,8 +6,7 @@ import (
 )
 
 func CheckDependencies() error {
-	// hyprctl is checked because hyprsunset may be installed without Hyprland
-	for _, bin := range []string{"hyprsunset", "hyprctl", "uwsm"} {
+	for _, bin := range []string{"hyprsunset", "uwsm", "notify-send"} {
 		if _, err := exec.LookPath(bin); err != nil {
 			return fmt.Errorf("%s not found in PATH", bin)
 		}
